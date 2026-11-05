@@ -1,7 +1,9 @@
 """Выравнивание слов по озвучке без распознавания речи: по паузам в аудио (ffmpeg silencedetect) и длине слов.
 Результат — projects/<slug>/timing.json: {"durs":[...сек на сцену], "words":[[время начала каждого слова], ...]}.
 Это приближённая синхронизация (точность порядка долей секунды)."""
-import re, json, subprocess, os
+import re, json, subprocess, os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'engine'))
+from ff import ffmpeg, duration
 
 LEAD, TAIL = 0.5, 0.8   # тишина перед озвучкой сцены и после неё, сек
 norm = lambda w: re.sub(r'[^\w]', '', w.lower().replace('ё', 'е'))
@@ -9,11 +11,10 @@ norm = lambda w: re.sub(r'[^\w]', '', w.lower().replace('ё', 'е'))
 def parse_tts(path):
     return [s.strip() for s in re.split(r'=== СЦЕНА \d+ ===', open(path, encoding='utf-8').read())[1:]]
 
-def probe(f):
-    return float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f]))
+probe = duration
 
 def speech_segments(f, dur):
-    sd = subprocess.run(['ffmpeg', '-v', 'info', '-i', f, '-af', 'silencedetect=noise=-38dB:d=0.12', '-f', 'null', '-'], capture_output=True, text=True).stderr
+    sd = subprocess.run([ffmpeg(), '-v', 'info', '-i', f, '-af', 'silencedetect=noise=-38dB:d=0.12', '-f', 'null', '-'], capture_output=True, text=True).stderr
     ss = [float(x) for x in re.findall(r'silence_start: ([\d.]+)', sd)]
     se = [float(x) for x in re.findall(r'silence_end: ([\d.]+)', sd)]
     seg, cur = [], 0.0
@@ -26,7 +27,7 @@ def speech_segments(f, dur):
 
 def word_weights(nw, tw):
     """Вес слова = длина его озвученной формы. Английские слова в сценарии сопоставляются с русской транскрипцией из narration_tts."""
-    lat = lambda x: re.search('[A-Za-z]', x)
+    lat = lambda x: re.search('[A-Za-z0-9]', x)   # латиница и цифры читаются иначе, чем пишутся
     weights = [0] * len(nw); ti = 0; j = 0
     while j < len(nw):
         if lat(nw[j]):

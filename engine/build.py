@@ -6,6 +6,9 @@
 Если есть projects/<slug>/voice/N.wav|mp3 (N = номер сцены), озвучка накладывается; иначе — тихая дорожка."""
 import sys, os, json, subprocess, glob
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ff import ffmpeg
+FF = ffmpeg()
 
 ENG = os.path.dirname(os.path.abspath(__file__))
 proj = os.path.abspath(sys.argv[1]); mode = sys.argv[2] if len(sys.argv) > 2 else 'preview'
@@ -16,7 +19,9 @@ rd = lambda p: open(p, encoding='utf-8').read()
 timing = ''
 tj = f'{proj}/timing.json'
 if os.path.exists(tj): timing = 'window.TIMING=' + rd(tj) + ';\n'
-html = rd(f'{ENG}/head.html').replace('{{HEADER}}', meta['header']) + '<script>\n' + timing + rd(f'{ENG}/lib.js') + '\n' + rd(f'{proj}/scenes.js') + '\n' + rd(f'{ENG}/runtime.js') + '\n</script>\n'
+TH = f"{ENG}/themes/{meta['theme']}" if meta.get('theme') else ENG      # тема проекта: engine/themes/<имя>/{head.html,lib.js,runtime.js}
+extra = ('\n' + rd(f'{TH}/lib.js')) if TH != ENG else ''
+html = rd(f'{TH}/head.html').replace('{{HEADER}}', meta['header']) + '<script>\n' + timing + rd(f'{ENG}/lib.js') + extra + '\n' + rd(f'{proj}/scenes.js') + '\n' + rd(f'{TH}/runtime.js') + '\n</script>\n'
 page_path = f'{OUT}/index.html'; open(page_path, 'w', encoding='utf-8').write(html)
 
 def voice_file(i):
@@ -55,7 +60,7 @@ with sync_playwright() as p:
         if all(have_voice) and not timing: sys.exit('есть voice/, но нет timing.json: сначала python3 tools/voice.py')
         for i, d in enumerate(durs):
             tmp, fin = f'{OUT}/scene_{i}.tmp.mp4', f'{OUT}/scene_{i}.mp4'
-            ff = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(FPS), '-i', '-', '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', tmp], stdin=subprocess.PIPE)
+            ff = subprocess.Popen([FF, '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(FPS), '-i', '-', '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', tmp], stdin=subprocess.PIPE)
             pg.evaluate(f'setScene({i})')
             for f in range(int(round(d * FPS))):
                 pg.evaluate(f'draw({f / FPS})'); ff.stdin.write(pg.screenshot(type='jpeg', quality=92))
@@ -64,18 +69,18 @@ with sync_playwright() as p:
             else: sys.exit('ffmpeg упал на сцене %d' % (i + 1))
             print('сцена', i + 1, 'готова', flush=True)
         open(f'{OUT}/list.txt', 'w').write(''.join(f"file 'scene_{i}.mp4'\n" for i in range(len(durs))))
-        subprocess.check_call(['ffmpeg', '-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', f'{OUT}/list.txt', '-c', 'copy', f'{OUT}/joined.tmp.mp4'])
+        subprocess.check_call([FF, '-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', f'{OUT}/list.txt', '-c', 'copy', f'{OUT}/joined.tmp.mp4'])
         final = f"{OUT}/{meta['slug']}.mp4"
         if all(have_voice):                          # озвучка: звук сцены начинается через 0.5 с, добиваем тишиной до длины сцены
             wavs = []
             for i, d in enumerate(durs):
                 w = f'{OUT}/a{i + 1}.wav'
-                subprocess.check_call(['ffmpeg', '-v', 'error', '-y', '-i', have_voice[i], '-af', f'adelay=500|500,apad=whole_dur={d}', '-ar', '44100', '-ac', '2', '-t', str(d), w]); wavs.append(w)
+                subprocess.check_call([FF, '-v', 'error', '-y', '-i', have_voice[i], '-af', f'adelay=500|500,apad=whole_dur={d}', '-ar', '44100', '-ac', '2', '-t', str(d), w]); wavs.append(w)
             open(f'{OUT}/alist.txt', 'w').write(''.join(f"file '{w}'\n" for w in wavs))
-            subprocess.check_call(['ffmpeg', '-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', f'{OUT}/alist.txt', '-c:a', 'aac', '-b:a', '160k', f'{OUT}/voice_all.m4a'])
-            subprocess.check_call(['ffmpeg', '-v', 'error', '-y', '-i', f'{OUT}/joined.tmp.mp4', '-i', f'{OUT}/voice_all.m4a', '-map', '0:v', '-map', '1:a', '-c', 'copy', '-shortest', '-movflags', '+faststart', final])
+            subprocess.check_call([FF, '-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', f'{OUT}/alist.txt', '-c:a', 'aac', '-b:a', '160k', f'{OUT}/voice_all.m4a'])
+            subprocess.check_call([FF, '-v', 'error', '-y', '-i', f'{OUT}/joined.tmp.mp4', '-i', f'{OUT}/voice_all.m4a', '-map', '0:v', '-map', '1:a', '-c', 'copy', '-shortest', '-movflags', '+faststart', final])
         else:
-            subprocess.check_call(['ffmpeg', '-v', 'error', '-y', '-i', f'{OUT}/joined.tmp.mp4', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-shortest', '-movflags', '+faststart', final])
+            subprocess.check_call([FF, '-v', 'error', '-y', '-i', f'{OUT}/joined.tmp.mp4', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-shortest', '-movflags', '+faststart', final])
         t0 = 0; lines = []
         for i, d in enumerate(durs):
             lines.append(f'[{t0:6.1f}s] сцена {i + 1}: {narr[i]}'); t0 += d
