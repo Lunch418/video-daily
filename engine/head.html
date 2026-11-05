@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:720px;height:1280px;overflow:hidden;background:#0c0d11}
+#app{position:relative;width:720px;height:1280px;font-family:'DejaVu Sans',sans-serif;color:#ece9e3;overflow:hidden;
+ background:radial-gradient(ellipse at 50% 30%,#171921 0%,#0c0d11 65%,#08090c 100%)}
+#grid{position:absolute;inset:0;background-image:linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:36px 36px}
+#stage{position:absolute;inset:0}
+.abs{position:absolute}
+.t2{background:#101116;border:1px solid #2c2f3a;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);overflow:hidden}
+.t2 .th{height:34px;display:flex;align-items:center;gap:7px;padding:0 14px;border-bottom:1px solid #22252e}
+.t2 .th i{width:9px;height:9px;border-radius:50%;background:#2c2f3a}
+.t2 .th span{margin-left:8px;font-size:12px;letter-spacing:1.5px;color:#7d808c;text-transform:uppercase}
+.t2 .tb{padding:8px 18px;font-family:'DejaVu Sans Mono',monospace;white-space:pre;color:#e8e6e1}
+.t2 .tb .p{color:#e8946a}.t2 .tb .o{color:#9a9da8}.t2 .tb .h{color:#6cc4ad}.t2 .tb .e{color:#e0706a}
+.lab{text-align:center;font-weight:700}
+.chip{padding:8px 18px;border-radius:999px;border:1px solid;font-size:24px;font-weight:700}
+#cap{position:absolute;left:50px;width:620px;top:1005px;height:150px;text-align:center;font-weight:700;font-size:35px;line-height:1.32}
+#hdr{position:absolute;left:30px;top:30px;font-size:15px;color:#8b8e9a;font-family:'DejaVu Sans Mono',monospace}
+#cnt{position:absolute;right:30px;top:30px;font-size:15px;color:#e8946a;font-family:'DejaVu Sans Mono',monospace;text-align:right}
+#prog{position:absolute;left:30px;right:30px;top:62px;height:3px;display:flex;gap:5px}
+#prog i{flex:1;background:#262833;border-radius:2px}
+</style>
+<div id="app"><div id="grid"></div><div id="stage"></div>
+<div id="hdr">{{HEADER}}</div><div id="cnt"></div><div id="prog"></div>
+<div id="cap"></div></div>
